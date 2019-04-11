@@ -7,7 +7,7 @@
  */
 
 namespace Kinfy\Http;
-
+use App\Controller\ArticleController;
 
 class Router
 {
@@ -15,7 +15,7 @@ class Router
     //当路由未匹配的时候执行的回调函数，默认为空
     public static $notFound = null;
     public static $delimiter = '@';
-    public static $namespace = '';
+    public static $namespace = 'App\\Controller\\';
     public static $url_pre = [];
 
     //存放当前注册的所有的路由规则
@@ -48,6 +48,8 @@ class Router
         $reqtype = strtoupper($reqtype);
         $pattern = self::path(implode('/' , self::$url_pre) .self::path($pattern));
 //        $pattern = self::path($pattern);
+
+        //判断是否是带参数路由
         $is_regx = strpos($pattern, '{') !== false;
 
         if (!$is_regx) {
@@ -55,8 +57,8 @@ class Router
         } else {
 
             $pattern_raw = $pattern;
-            //先找出占位符的名称
-            $is_matched = preg_match_all('#{(.*?}#', $pattern, $pnames);
+            //先找出占位符的名称(?的作用为取消贪婪模式)
+            $is_matched = preg_match_all('#{(.*?)}#', $pattern, $pnames);
             if($is_matched){
                 //占位符默认替换的规则为全部
                 foreach ($pnames[1] as $p){
@@ -64,13 +66,14 @@ class Router
 
                     $rule = '.+';
 
+                    //判断路由是否具有正则约束
                     if(is_array($re_rule) && isset($re_rule[$pname])) {
 
                         $rule = $re_rule[$pname];
 
                     }else if(isset(self::$default_rule[$pname])) {
                         $rule = self::$default_rule[$pname];
-                    }else if(strpos($pname, '?') !== false){
+                    }else if(strpos($p, '?') !== false){
                         $rule = '.*';
                     }
 
@@ -129,8 +132,9 @@ class Router
 
         $is_matched = false;
         $callback = null;
-        $params = null;
+        $params = [];
 
+        //先判断是否是ANY
         if(isset($routes['ANY'][$url])){
             $callback = $routes['ANY'][$url];
             $is_matched = true;
@@ -155,6 +159,7 @@ class Router
 
             if(!$is_matched && isset($re_routes[$reqtype])){
                 foreach ($re_routes[$reqtype] as $pattern => $route) {
+                    var_dump($route);
                     $is_matched = preg_match_all($route['pattern_re'], $url, $params);
 
                     if ($is_matched) {
@@ -166,15 +171,12 @@ class Router
             }
         }
 
-
-
-
         if($is_matched){
 
             if(is_callable($callback)){
                 call_user_func($callback, ...$params);
             }else{
-
+                //调用控制器
                 list($class,$method) = explode(self::$delimiter,$callback);
                 $class =self::$namespace.$class;
                 $obj= new $class();
