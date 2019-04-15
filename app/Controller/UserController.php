@@ -7,7 +7,7 @@
  */
 namespace App\Controller;
 
-class UserController
+class UserController extends BaseController
 {
 
     public function index()
@@ -17,5 +17,19 @@ class UserController
     public  function add()
     {
         echo 'user add';
+    }
+
+    public function login(){
+        echo '登录页面！！';
+    }
+
+    public function del($id){
+        echo $id;
+    }
+
+    public  function BeforeDel($id){
+        if($id == 1){
+            echo '无法删除超管';
+        }
     }
 }
