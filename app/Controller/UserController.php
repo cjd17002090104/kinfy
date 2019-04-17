@@ -6,7 +6,6 @@
  * Time: 14:18
  */
 namespace App\Controller;
-
 class UserController extends BaseController
 {
 

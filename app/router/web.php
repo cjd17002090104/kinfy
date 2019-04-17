@@ -10,7 +10,7 @@
  * Time: 14:57
  */
 use Kinfy\Http\Router;
-
+use App\Model\Model;
 //Router::get('/',function (){
 //   echo "INDEX PAGE";
 //   $str = 'askflksfjkl@sdfj.com';
@@ -31,5 +31,6 @@ use Kinfy\Http\Router;
 //});
 Router::get('/login/{1}','UserController@login');
 Router::get('/user',function (){
-   echo '1234560';
+    $model=new Model();
+    $model->printConfig();
 });
