@@ -6,13 +6,29 @@
  * Time: 14:18
  */
 namespace App\Controller;
+use App\Model\User;
+
 class UserController extends BaseController
 {
-
     public function index()
     {
-        echo 'user index';
+        $user=new User();
+        $user->join("article","user.id","=","article.id")
+             ->where("user.id","=",1)
+             ->where("user.id","=","2","or")
+             ->select("user.id","user.name")
+             ->get();
     }
+
+    public function after()
+    {
+        echo'after';
+    }
+    public function before()
+    {
+        echo'before';
+    }
+
     public  function add()
     {
         echo 'user add';

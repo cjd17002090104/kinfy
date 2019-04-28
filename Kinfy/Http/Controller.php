@@ -23,10 +23,12 @@ class Controller
         'global_prefix' => 'before',
         'global_suffix' => 'after',
         'prefix'=>[
-            'login'=>'before'
+            'login'=>'before',
+            'index'=>'before'
         ],
         'suffix'=>[
-            'login'=>'after'
+            'login'=>'after',
+            'index'=>'before'
         ],
         'band'=>[
             'login'

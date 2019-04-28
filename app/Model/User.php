@@ -7,12 +7,11 @@
  */
 
 namespace App\Model;
-require './Model.php';
+use Kinfy\Model\Model;
 class User extends Model
 {
     protected $table='user';
     protected $primaryKey='id';
 }
 
-$user=new User();
-$user->where('id','>=','1')->find(1);
+

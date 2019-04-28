@@ -29,7 +29,7 @@ use App\Model\Model;
 //Router::get('user',function (){
 //    echo 'user';
 //});
-Router::get('/login/{1}','UserController@login');
+Router::get('/login','UserController@index');
 Router::get('/user',function (){
     $model=new Model();
     $model->printConfig();
