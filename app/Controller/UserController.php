@@ -13,11 +13,8 @@ class UserController extends BaseController
     public function index()
     {
         $user=new User();
-        $user->join("article","user.id","=","article.id")
-             ->where("user.id","=",1)
-             ->where("user.id","=","2","or")
-             ->select("user.id","user.name")
-             ->get();
+        $result=$user->get();
+        var_dump($result);
     }
 
     public function after()
