@@ -16,7 +16,6 @@ class Model
     protected $table;
     protected $primaryKey;
     //实例数据
-    private $data = [];
     protected $dbConfig = [
         'PORT' => '3306',
         'DB_NAME' => 'kinfy',
@@ -30,7 +29,7 @@ class Model
     private $join = "";
     private $fields = null;
     private $pdo;
-    private $insertKey = [];
+    private $orderBy = [];
 
     public function __construct()
     {
@@ -55,6 +54,16 @@ class Model
     }
 
     /**
+     * @param $table  表名
+     * @return $this
+     */
+    public function table($table)
+    {
+        $this->table = $table;
+        return $this;
+    }
+
+    /**
      *
      * 条件约束
      *
@@ -76,9 +85,93 @@ class Model
 //            $value = $operator;
 //            $operator = '=';
 //        }
-        $this->values[] = "$value";
+        $this->values['where'][] = "$value";
         $this->where[] = ['type' => $total_type, 'sentence' => "$field $operator ?"];
         return $this;
+    }
+
+    /**
+     * @param $values
+     * @param bool $force_align 是否排序（适用于字段值相同的多数据插入）
+     */
+    public function batchInsert($values, $force_align = true)
+    {
+        //插入数据的键值一致时
+        if ($force_align) {
+            foreach ($values as $value) {
+                //循环数组,将每个元素的键排序
+                ksort($value);
+                foreach ($value as $v) {
+                    $this->values['data'][] = $v;
+                }
+            }
+
+            //取出需要插入的字段名
+            $this->fields = implode(',', array_keys($value));
+
+            //预处理value（？）拼接
+            $ph = array_pad($ph = [], sizeof($value), '?');
+            $ph = implode(',', $ph);
+
+            $SQLvaluesPrepare = "";
+            for ($i = 1; $i <= sizeof($values); $i++) {
+                $SQLvaluesPrepare .= "({$ph}),";
+            }
+
+            $SQLvaluesPrepare = trim($SQLvaluesPrepare, ',');
+
+            $this->DoStmt('INSERT', $SQLvaluesPrepare);
+        } //插入数据的键值不一致时
+        else {
+            $sql = "";
+            foreach ($values as $value) {
+                $ph = [];
+                $ph = array_pad($ph, sizeof($value), '?');
+                $ph = implode(',', $ph);
+                $insertKey = implode(',', array_keys($value));
+                $sql .= "INSERT INTO {$this->table} ({$insertKey}) VALUES ({$ph});\n";
+                foreach ($value as $v) {
+                    $this->values['data'][] = $v;
+                }
+            }
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute(array_merge($this->values['data'], $this->values['where']));
+        }
+
+    }
+
+    /**
+     * @param $values
+     */
+    public function insert($values)
+    {
+
+        if (!is_array(reset($values))) {
+            $values = [$values];
+            var_dump($values);
+        }
+
+        $this->batchInsert($values);
+    }
+
+    public function delete()
+    {
+        $this->DoStmt('DELETE');
+    }
+
+    /**
+     * @param $value 值数组
+     */
+    function update($value)
+    {
+        $SQLvaluesPrepare = "";
+        foreach ($value as $k => $v) {
+            $SQLvaluesPrepare .= "$k = ?,";
+            $this->values['data'][] = $v;
+        }
+        $SQLvaluesPrepare = rtrim($SQLvaluesPrepare, ',');
+        $this->DoStmt('UPDATE', $SQLvaluesPrepare);
     }
 
     /**
@@ -90,14 +183,15 @@ class Model
         return $this->DoStmt('SELECT')->fetchAll();
     }
 
-    /**
-     * @param $table  表名
-     * @return $this
-     */
-    public function table($table)
+    public function clearData()
     {
-        $this->table = $table;
-        return $this;
+        $this->where = [];
+        $this->group = "";
+        $this->values = [];
+        $this->join = "";
+        $this->fields = null;
+        $this->pdo;
+        $this->orderBy = [];
     }
 
     public function join($table, $field1, $op, $field2)
@@ -135,7 +229,7 @@ class Model
             $columns = implode(',', $this->fields);
         };
         $action = "SELECT {$columns} FROM";
-        $this->where($this->primaryKey,'=', $id);
+        $this->where($this->primaryKey, '=', $id);
         var_dump($this->DoStmt('SELECT')[0]);
 
     }
@@ -144,71 +238,70 @@ class Model
      * @param $action SQL头部
      * @return string
      */
-    public function DoStmt($action,$SQLvalues=null)
+    public function DoStmt($action, $SQLvaluesPrepare = null)
     {
-        $fields=isset($this->fields)? $this->fields : '*';
+        $fields = isset($this->fields) ? $this->fields : '*';
 
         switch ($action) {
             case 'SELECT':
                 $where = $this->where ? $this->whereImplode() : "";
-                $sql="SELECT {$fields} FROM {$this->table} {$this->join} {$where}";
+                $orderBy = $this->orderBy ? $this->orderByImplode() : "";
+                $sql = "SELECT {$fields} FROM {$this->table} {$this->join} {$where} {$orderBy}";
+                var_dump($sql);
                 break;
             case 'INSERT':
-                $sql="INSERT INTO {$this->table} ({$fields}) VALUES {$SQLvalues}";
+                $sql = "INSERT INTO {$this->table} ({$fields}) VALUES {$SQLvaluesPrepare}";
+                break;
+            case 'UPDATE':
+                $where = $this->whereImplode();
+                $sql = "UPDATE {$this->table} SET {$SQLvaluesPrepare} {$where}";
+                break;
+            case 'DELETE':
+                $where = $this->whereImplode();
+                $sql = "DELETE FROM {$this->table} {$where}";
+                var_dump($sql);
                 break;
         }
-        $stmt=$this->pdo->prepare($sql);
-        $stmt->execute($this->values);
+        $stmt = $this->pdo->prepare($sql);
+
+        $stmt->execute(
+            isset($this->values['where']) ?
+                (array_merge($this->values['data'], $this->values['where'])) : $this->values['data']
+        );
+
 
         //抛出异常
-        if($err=$stmt->errorInfo()[2]){
+        if ($err = $stmt->errorInfo()[2]) {
             var_dump($err);
             die;
         }
-
+        $this->clearData();
         return $stmt;
     }
 
 
-    public function getWhere()
+    /**
+     * @param $field
+     * @param $sort_type
+     * @return $this
+     */
+    function orderBy($field, $sort_type)
     {
-        var_dump($this->where);
+        $this->orderBy[] = [$field, $sort_type];
+        return $this;
     }
 
-
     /**
-     * @param $values
-     * @param bool $force_align 是否排序（适用于字段值相同的多数据插入）
+     * @return string
      */
-    public function batchInsert($values, $force_align = true)
+    function orderByImplode()
     {
-        foreach ($values as $value) {
-            //循环数组,将每个元素的键排序
-            ksort($value);
-            foreach ($value as $v) {
-                $this->values[] = $v;
-            }
+        $orderBy = 'ORDER BY ';
+        foreach ($this->orderBy as $v) {
+            $orderBy .= "{$v[0]} {$v[1]},";
         }
-
-        //取出需要插入的字段名
-        $this->fields = implode(',', array_keys($value));
-
-        //预处理value（？）拼接
-        $ph = array_pad($SQLvalues = [], sizeof($value), '?');
-        $ph = implode(",", $ph);
-
-        $SQLvalues = "";
-        for ($i = 1; $i <= sizeof($values); $i++) {
-            $SQLvalues .= "({$ph}),";
-        }
-
-        $SQLvalues=trim($SQLvalues, ",");
-
-        $this->DoStmt('INSERT', $SQLvalues);
+        return trim($orderBy, ',');
     }
 
 }
-//[a-zA-Z][a-zA-Z_0-9]{7,9}
-//cjd_123456
-//$model=new Model;
-//$model->where('id','>=','1')->get();
+

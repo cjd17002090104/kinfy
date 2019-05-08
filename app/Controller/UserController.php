@@ -13,7 +13,7 @@ class UserController extends BaseController
     public function index()
     {
         $user=new User();
-        $result=$user->get();
+        $result=$user->insert(['email'=>'123546331']);
         var_dump($result);
     }
 
