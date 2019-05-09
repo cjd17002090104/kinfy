@@ -7,8 +7,8 @@
  */
 
 namespace App\Model;
-use Kinfy\Model\Model;
-class User extends Model
+use Kinfy\DB\DB;
+class User extends DB
 {
     protected $table='user';
     protected $primaryKey='id';
