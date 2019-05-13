@@ -14,34 +14,7 @@ class UserController extends BaseController
     {
         $user=new User();
         $result=$user->insert(['email'=>'123546331']);
-        var_dump($result);
     }
 
-    public function after()
-    {
-        echo'after';
-    }
-    public function before()
-    {
-        echo'before';
-    }
 
-    public  function add()
-    {
-        echo 'user add';
-    }
-
-    public function login(){
-        echo '登录页面！！';
-    }
-
-    public function del($id){
-        echo $id;
-    }
-
-    public  function BeforeDel($id){
-        if($id == 1){
-            echo '无法删除超管';
-        }
-    }
 }

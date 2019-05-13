@@ -53,6 +53,15 @@ class DB
 
     }
 
+
+    /**
+     * @param $primaryKey
+     */
+    public function setPrimaryKey($primaryKey)
+    {
+        $this->primaryKey=$primaryKey;
+    }
+
     /**
      * @param $table  表名
      * @return $this

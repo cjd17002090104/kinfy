@@ -14,6 +14,8 @@ class Model
 {
     //存放当前实例
     protected static $instance = null;
+    //存放当前主键
+    protected $primaryKey=null;
     //存放实例对应的数据表
     protected $table = '';
     //当前数据库对象
@@ -136,7 +138,7 @@ class Model
         }
 
         $this->DB->table($this->table);
-
+        $this->DB->setPrimaryKey($this->primaryKey);
     }
 
     //判断是否是终端函数

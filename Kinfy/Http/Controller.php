@@ -23,8 +23,6 @@ class Controller
         'global_prefix' => 'before',
         'global_suffix' => 'after',
         'prefix'=>[
-            'login'=>'before',
-            'index'=>'before'
         ],
         'suffix'=>[
             'login'=>'after',
@@ -59,14 +57,14 @@ class Controller
                 }
 
                 //执行前置
-                if(isset(self::$conf['prefix'])){
+                if(!empty(self::$conf['prefix'])){
                     self::execMethod($obj,self::$conf['prefix'][$method].$method,$params);
                 }
 
                 $obj->{$method}(...$params);
 
                 //执行后置
-                if(isset(self::$conf['suffix'])){
+                if(!empty(self::$conf['suffix'])){
                     self::execMethod($obj,self::$conf['suffix'][$method].$method,$params);
                 }
 
