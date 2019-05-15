@@ -25,7 +25,7 @@ class DB
     //where条件
     private $where = [];
     private $group = "";
-    private $values = [];
+    private $values = ['data'=>[]];
     private $join = "";
     private $fields = null;
     private $pdo;
@@ -196,11 +196,16 @@ class DB
     {
         $this->where = [];
         $this->group = "";
-        $this->values = [];
+        $this->values = ['data'=>[]];
         $this->join = "";
         $this->fields = null;
         $this->pdo;
         $this->orderBy = [];
+    }
+
+    public function first()
+    {
+        return $this->DoStmt('SELECT')->fetchAll()[0];
     }
 
     public function join($table, $field1, $op, $field2)
@@ -273,6 +278,7 @@ class DB
         }
         $stmt = $this->pdo->prepare($sql);
 
+        var_dump(array_merge($this->values['data'], $this->values['where']));
         $stmt->execute(
             isset($this->values['where']) ?
                 (array_merge($this->values['data'], $this->values['where'])) : $this->values['data']

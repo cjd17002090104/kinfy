@@ -12,7 +12,8 @@ use Kinfy\Model\Model;
 class User extends Model
 {
     protected $table='user';
-    protected $primaryKey='id';
+    protected $pk='id';
+    protected $field2property=['id'=>'Id'];
 }
 
 
