@@ -278,7 +278,6 @@ class DB
         }
         $stmt = $this->pdo->prepare($sql);
 
-        var_dump(array_merge($this->values['data'], $this->values['where']));
         $stmt->execute(
             isset($this->values['where']) ?
                 (array_merge($this->values['data'], $this->values['where'])) : $this->values['data']

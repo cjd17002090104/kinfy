@@ -32,7 +32,14 @@ class Model
     protected $autoCamelCase = true;
 
     //模型对应数据库的主键
-    protected $pk = 'id';
+    protected $pk = '';
+
+    protected $fillabe = [];
+
+    protected $gruard = [];
+
+    //数据库隐藏字段
+    public $fieldView = [];
 
     //主键是否是由数据库自动生成
     protected $autoPk = true;
@@ -102,43 +109,81 @@ class Model
         return $c;
     }
 
-    /**
-     * save方法会用到，将设定的属性通过camel2snake方法变成下划线格式
-     */
-    //往数据库添加的时候，属性名为fieldName要转换成field_name
-    protected function filterFields()
+    public function property2field($name)
     {
         if (empty($this->property2field)) {
             //倒置$this->field2property
             $this->property2field = array_flip($this->field2property);
         }
-        foreach ($this->properties as $k => $v) {
-            //匹配当前所设置的属性，将匹配中的属性传给fields数组
-            if (isset($this->property2field[$k])) {
-                $k = $this->property2field[$k];
-            } else if ($this->autoCamelCase) {
-                //未匹配中（没有别名）且开启自动规范的情况下 将属性变成下划线模式
-                $k = $this->camel2snake($k);
+
+
+        //匹配当前所设置的属性，将匹配中的属性传给fields数组
+        if (isset($this->property2field[$name])) {
+            return $this->property2field[$name];
+        }
+
+        if ($this->autoCamelCase) {
+            //未匹配中（没有别名）且开启自动规范的情况下 将属性变成下划线模式
+            return $this->camel2snake($name);
+        }
+    }
+
+    /**
+     * save方法会用到，将设定的属性通过camel2snake方法变成下划线格式
+     */
+    //往数据库添加的时候，属性名为fieldName要转换成field_name
+    //同时要删除禁止批量赋值的列
+    protected function filterFields($data = [])
+    {
+        //批量添加的数据，经过黑白名单过滤
+        if ($data) {
+            foreach ($data as $k => $v) {
+                $k = $this->property2field($k);
+                //白名单优先
+                //如果设置了白名单，以白名单为准，否则已黑名单为准
+                if ($this->fillable) {
+                    if (!isset($this->fillable[$k]))
+                        continue;
+                }
+
+                if ($this->guarded) {
+                    if (isset($this->guarded[$k]))
+                        continue;
+                }
+
+                $this->fields[$k] = $v;
             }
-            $this->fields[$k] = $v;
+        }
+
+        //手工添加的数据不过滤
+        foreach ($this->properties as $k2 => $v2) {
+            $k2 = $this->property2field($k2);
+            $this->fields[$k2] = $v2;
+
+
         }
     }
 
     //数据库里读取出来的数据，列名为field_name要转换成fieldName
     protected function filterProperties($data)
     {
-        //若没有数据列别名，且自动转换关闭
+        //没有自定义列名转换规则，同时也关闭了自动转换规则，且有没有隐藏列，则不循环直接返回
         if (empty($this->field2property) && $this->autoCamelCase) {
             return $data;
         }
         $new_data = [];
         foreach ($data as $k => $v) {
             if (isset($this->field2property[$k])) {
-                $k = $this->field2property[$k];
+                $k2 = $this->field2property[$k];
             } else if ($this->autoCamelCase) {
-                $k = $this->snake2camel($k);
+                $k2 = $this->snake2camel($k);
             }
-            $new_data[$k] = $v;
+            if (isset($this->fieldView[$k])) {
+                $new_data[$k2] = $this->fieldView[$k];
+            } else {
+                $new_data[$k2] = $v;
+            }
+            $new_data[$k2] = $v;
         }
         return $new_data;
     }
@@ -170,8 +215,8 @@ class Model
         }
 
         $this->DB->table($this->table);
-        if($this->pk)
-        $this->fields[$this->pk]=null;
+        if ($this->pk)
+            $this->fields[$this->pk] = null;
     }
 
     //判断是否是终端函数
@@ -223,14 +268,14 @@ class Model
     }
 
     //新增或者更新方法，取决于主键是否有值
-    public function save($isAdd = false)
+    public function save($data = [])
     {
-        $this->filterFields();
+
         //如果强制添加，或者没有主键，则添加，否则更新
-        if ($isAdd||!$this->havePk()) {
-            return $this->add();
-        }else{
-            return $this->update();
+        if (!$this->pk||!$this->havePk()) {
+            return $this->add($data);
+        } else {
+            return $this->update($data);
         }
 
     }
@@ -244,12 +289,12 @@ class Model
 
     public function havePK()
     {
-        return $this->fields[$this->pk] !== null;
+        return $this->properties[$this->pk] !== null;
     }
 
-    public function add()
+    public function add($data = [])
     {
-
+        $this->filterFields();
         if ($this->autoPk) {
             unset($this->fields[$this->pk]);
         } else if (!$this->havePk()) {
@@ -259,14 +304,18 @@ class Model
         return $this->DB->insert($this->fields);
     }
 
-    public function update()
+    public function update($data = [])
     {
+        $this->filterFields();
+        if (!$data) {
+            $data = $this->fields;
+        }
         $k = $this->pk;
         $v = $this->fields[$this->pk];
 
         unset($this->fields[$this->pk]);
         return $this->DB
-            ->where($k,'=',$v)
+            ->where($k, '=', $v)
             ->update($this->fields);
     }
 
