@@ -126,6 +126,21 @@ class Model
             //未匹配中（没有别名）且开启自动规范的情况下 将属性变成下划线模式
             return $this->camel2snake($name);
         }
+
+        return $name;
+    }
+
+    public function field2property($name)
+    {
+        if (isset($this->field2property[$name])) {
+            return $this->field2property[$name];
+        }
+
+        if ($this->autoCamelCase) {
+            return $this->snake2camel($name);
+        }
+
+        return $name;
     }
 
     /**
@@ -142,12 +157,12 @@ class Model
                 //白名单优先
                 //如果设置了白名单，以白名单为准，否则已黑名单为准
                 if ($this->fillable) {
-                    if (!isset($this->fillable[$k]))
+                    if (!in_array($this->fillable[$k]))
                         continue;
                 }
 
                 if ($this->guarded) {
-                    if (isset($this->guarded[$k]))
+                    if (in_array($this->guarded[$k]))
                         continue;
                 }
 
@@ -173,11 +188,9 @@ class Model
         }
         $new_data = [];
         foreach ($data as $k => $v) {
-            if (isset($this->field2property[$k])) {
-                $k2 = $this->field2property[$k];
-            } else if ($this->autoCamelCase) {
-                $k2 = $this->snake2camel($k);
-            }
+            $k2 = $this->field2property($k);
+
+            //过滤隐藏字段
             if (isset($this->fieldView[$k])) {
                 $new_data[$k2] = $this->fieldView[$k];
             } else {
@@ -201,7 +214,7 @@ class Model
     }
 
     //构造函数，初始化当前对应的数据表，初始化当前实例对应的数据库对象
-    public function __construct()
+    public function __construct($id = null)
     {
 
         //获取类名与数据库名字绑定
@@ -215,8 +228,11 @@ class Model
         }
 
         $this->DB->table($this->table);
-        if ($this->pk)
-            $this->fields[$this->pk] = null;
+        if ($id) {
+            $this->DB->where($this->pk, $id);
+
+            $this->first();
+        }
     }
 
     //判断是否是终端函数
@@ -230,10 +246,28 @@ class Model
         return in_array($name, $m);
     }
 
+    //判断是否是重写DB方法
+    private function isSelfMethod($name)
+    {
+        $name = strtolower($name);
+        $m = [
+            'add',
+            'update',
+            'save'
+        ];
+        return in_array($name, $m);
+    }
+
     //当调用一个不存在的实例方法时则自动调用该魔术方法
     public function __call($name, $arguments)
     {
         $name = strtolower($name);
+
+        //如果调用自身的，则不调用DB
+        if($this->isSelfMethod($name)){
+            $sname= '_'.$name;
+            $this->{$sname}(...$arguments);
+        }
         $r = $this->DB->{$name}(...$arguments);
         //如果不是结束节点(获取数据)
         if (!$this->isTerminalMethod($name)) {
@@ -259,20 +293,27 @@ class Model
         }
     }
 
-    public static function __callStatic($name, $arguments)
+    //因为当执行静态代码时，自身有一个实例static::$instance
+    //返回静态的共用的实例
+    public static function getInstance()
     {
         if (!static::$instance) {
             static::$instance = new static();
         }
-        return static::$instance->{$name}(...$arguments);
+        return static::$instance;
+    }
+
+    public static function __callStatic($name, $arguments)
+    {
+        return static::getInstance()->{$name}(...$arguments);
     }
 
     //新增或者更新方法，取决于主键是否有值
-    public function save($data = [])
+    public function _save($data = [])
     {
 
         //如果强制添加，或者没有主键，则添加，否则更新
-        if (!$this->pk||!$this->havePk()) {
+        if (!$this->pk || !$this->havePk()) {
             return $this->add($data);
         } else {
             return $this->update($data);
@@ -280,21 +321,17 @@ class Model
 
     }
 
-    //因为当执行静态代码时，自身有一个实例static::$instance
-    //返回静态的共用的实例
-    public static function getInstance()
-    {
-        return static::$instance;
-    }
+
 
     public function havePK()
     {
         return $this->properties[$this->pk] !== null;
     }
 
-    public function add($data = [])
+    public function _add($data = [])
     {
         $this->filterFields();
+        //判断是否是自增PK
         if ($this->autoPk) {
             unset($this->fields[$this->pk]);
         } else if (!$this->havePk()) {
@@ -304,12 +341,10 @@ class Model
         return $this->DB->insert($this->fields);
     }
 
-    public function update($data = [])
+    public function _update($data = [])
     {
         $this->filterFields();
-        if (!$data) {
-            $data = $this->fields;
-        }
+
         $k = $this->pk;
         $v = $this->fields[$this->pk];
 
