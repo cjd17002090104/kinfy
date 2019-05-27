@@ -9,15 +9,21 @@
 namespace App\Controller;
 
 use App\Model\User;
+use Kinfy\View\View;
 
 class UserController extends BaseController
 {
     public function index()
     {
-        $user = new User();
-        $user->id='32';
-        $user->email = "123456789123456";
-        $user->save();
+        $view = new View();
+        $view->set('title',
+            [
+                ['icon-location2', 'Brooklyn, NY 10036, United States'],
+                ['icon-phone2', '+1-123-456-7890'],
+                ['icon-mail', 'info@probootstrap.com']
+            ]
+        );
+        $view->show('school');
 
     }
 

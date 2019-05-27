@@ -17,12 +17,9 @@ class View
     public $base_dir = '';
     //模板引擎缓存文件夹（存放资源文件）(可清空)
     public $cache_dir = '';
-    //模板主题
+    //模板默认主题
     public $theme = 'default';
-    //模板主题根目录
-    public $base = '';
-    //模板主题缓存目录
-    public $cache = '';
+
     //模板文件后缀
     public $suffix = '.tpl.php';
     //模板自动更新
@@ -37,75 +34,122 @@ class View
         if ($engine) {
             $this->compiler = new $engine();
         } else {
-            $this->compiler = new $engine();
+            $this->compiler = new \Kinfy\View\engine\Blade();
         }
-        if ($this->base_dir) {
-            $this->base_dir = 'E:/kinfy/View/';
+        //设置默认模板引擎的目录
+        if (!$this->base_dir) {
+            $this->base_dir = 'D:/wampsever/wamp64/www/kinfy/app/View/';
         }
-
-        if ($this->cache_dir) {
-            $this->cache_dir = 'E:/kinfy/View/';
+        //设置默认模板引擎的缓存目录
+        if (!$this->cache_dir) {
+            $this->cache_dir = 'D:/wampsever/wamp64/www//kinfy/app/Cache/';
         }
-
-        $this->base = $this->base_dir . $this->theme . '/';
-        $this->cache = $this->cache_dir . $this->theme . '/';
 
     }
+    /**
+     * @return string  /返回主题资源文件根目录
+     */
+    public function themeBaseDir()
+    {
+        return $this->base_dir . $this->theme . '/';
+    }
 
-    //模板变量赋值
+    /**
+     * @return string /返回主题缓存文件根目录
+     */
+    public function themeCacheDir()
+    {
+        return $this->cache_dir . $this->theme . '/';
+    }
+
+    /**
+     * @param $name /模板文件名字
+     * @return string /根据名称返回模板资源文件
+     */
+    public function tplFile($name)
+    {
+        return $this->themeBaseDir() . $name . $this->suffix;
+    }
+
+    /**
+     * @param $name /缓存文件名字
+     * @return string /根据名称返回模板缓存文件
+     */
+    public function tplCache($name)
+    {
+        return $this->themeCacheDir() . $name . $this->suffix;
+    }
+
+    /**
+     * @param $name
+     * @param $value /通过引擎解析变量，之后再将之存到data数组中
+     */
     public function set($name, $value)
     {
+
         $this->data[$name] = $value;
     }
 
-    //模板显示
+
+
+    /**
+     * @param $tpl
+     * /模板显示
+     */
     public function show($tpl)
     {
+        //将data的变量提取出来
         extract($this->data);
         //拼接缓存文件如index 则转换成 E:/kinfy/Cache/default/index.tpl.php
-        $tpl_cache = $this->cache . $tpl . $this->suffix;
+        $tpl_cache = $this->tplCache($tpl);
+        //强制更新
         if ($this->auto_refresh || !file_exists($tpl_cache)) {
             $this->compiling($tpl);
         }
         include $tpl_cache;
     }
 
-    //模板编译
+    /**
+     * @param $tpl  /模板编译
+     */
     public function compiling($tpl)
     {
         $c = $this->compiler;
+        $c->base_dir = $this->themeBaseDir();
+        $c->suffix = $this->suffix;
         //模板读取
-        $tpl_file = $tpl_base = $this->base . $tpl . $this->suffix;
-        $c->template = file_get_contents($tpl_file);
+        //取出模板内容
+        $c->template = file_get_contents($this->tplFile($tpl));
 
 
-        //layout又叫master支持，母版
-        $c->extendsExp();
+        //模板编译
+        $c->compiling();
 
-        //执行调用
-        $c->includeExp();
 
-        //执行判断语句
-        $c->ifExp();
-        $c->elseifExp();
-        $c->elseExp();
-        $c->endifExp();
+        //写入模板前，判断是否有对应主题的缓存文件夹，如无，则创建之
+        $this->mkTplCacheDir($tpl);
 
-        //循环语句
-        $c->loopExp();
-        $c->endloopExp();
+        //将模板文件读入缓存文件
+        //若没有缓存文件则会生成一个缓存文件
+        file_put_contents($this->tplCache($tpl), $c->template);
+    }
 
-        //变量
-        $c->varExp();
+    //创建缓存文件所对应的目录，逐级创建
+    protected function mkTplCacheDir($tpl)
+    {
+        //生成缓存文件夹
+        $tpl_cache_path = $this->theme . '/' . $tpl;
 
-        //模板缓存文件
-        $tpl_cache = $this->cache . $tpl . $this->suffix;
+        $path_arr = explode('/', $tpl_cache_path);
+        $dir = $this->cache_dir;
+        //default/article/index.tpl.php
+        for ($i = 0; $i < count($path_arr) - 1; $i++) {
+            $dir .= $path_arr[$i].'/';
 
-        if (!is_dir($this->cache)) {
-            mkdir($this->cache);
+            if (!is_dir($dir)) {
+                //新建文件夹
+                mkdir($dir);
+            }
         }
-
-        //写入模板文件
-        file_put_contents($tpl_cache, $c->template);
     }
 }
