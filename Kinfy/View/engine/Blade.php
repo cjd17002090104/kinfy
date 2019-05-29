@@ -15,11 +15,15 @@ class Blade implements Iengine
     public $base_dir;
     //模板子模板数组
     protected $sub_tpls = [];
+    //模板对应的父模板路径数组
+    protected $tpl_parents = [];
     //模板定界符
     public $tag = ['{', '}'];
     //要处理的模板文件
     public $template = '';
-    //模板文件的后缀
+    //当前解析的模板名称
+    public $tpl = '';
+    //模板文件后缀
     public $suffix = '';
 
     public function compiling()
@@ -27,8 +31,9 @@ class Blade implements Iengine
 //        //layout又叫master支持，母版
 //        $this->extendsExp();
 //
-//        //执行调用
-          $this->includeExp();
+
+        //执行调用
+        $this->includeExp();
 //
 //        //执行判断语句
 //        $this->ifExp();
@@ -37,8 +42,8 @@ class Blade implements Iengine
 //        $this->endifExp();
 //
 //        //循环语句
-          $this->loopExp();
-          $this->endloopExp();
+        $this->loopExp();
+        $this->endloopExp();
 
         //变量
         $this->varExp();
@@ -95,21 +100,25 @@ class Blade implements Iengine
     }
 
     //include
-    public function includeExp($content = null)
+    public function includeExp($content = null, $parent = null)
     {
         $exp = 'include\s+(.*?)';
         $pattern = "/{$this->tag[0]}\s*{$exp}\s*{$this->tag[1]}/is";
         //匹配子模板名称，并且调用readTpl方法检测是否重复,如果没有include则会返回false
-        if($content){
+        if ($content) {
             return preg_replace_callback(
                 $pattern,
-                [$this, 'includeTpl'],
+                function ($matches) use($parent){
+                    return $this->includeTpl($matches[1],$parent);
+                },
                 $content
             );
-        }else{
+        } else {
             $this->template = preg_replace_callback(
                 $pattern,
-                [$this, 'includeTpl'],
+                function ($matches) use($parent){
+                    return $this->includeTpl($matches[1],$parent);
+                },
                 $this->template
             );
         }
@@ -117,29 +126,29 @@ class Blade implements Iengine
         return $content;
     }
 
-    protected function includeTpl($matches)
+    protected function includeTpl($sub,$parent)
     {
-        return $this->readTpl($matches[1]);
-    }
-
-    private function readTpl($tpl)
-    {
-        //检查模板是否死循环调用
-        if (in_array($tpl, $this->sub_tpls)) {
-            die("{$tpl} 文件调用产生死循环");
-        } else {
-            $this->sub_tpls[] = $tpl;
+        //模板递归调用判断
+        if (isset($this->tpl_parents[$parent])) {
+            $parent_path = $this->tpl_parents[$parent];
+            $parent_path[] = $parent;
+            //检查模板是否死循环调用
+            if (in_array($sub, $parent_path)) {
+                die("{$parent} 调用 {$sub} 文件调用产生死循环");
+            } else {
+                $this->tpl_parents[$sub] = $parent_path;
+            }
         }
-        //调用子模板
-        $file = "{$this->base_dir}/{$tpl}{$this->suffix}";
+        //读取子模板
+        $file = "{$this->base_dir}{$sub}{$this->suffix}";
         if (!file_exists($file)) {
             die("{$file}文件不存在，或者不可读取");
         }
         $content = file_get_contents($file);
         //如果内容为空则跳出
-        if($content == ""){
+        if ($content == "") {
             return false;
         }
-        return $this->includeExp($content);
+        return $this->includeExp($content,$sub);
     }
 }
