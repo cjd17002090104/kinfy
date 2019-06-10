@@ -8,8 +8,8 @@
 
 namespace Kinfy\View;
 
-
-class View
+use Kinfy\Config\Config;
+class View implements IView
 {
     //模板引擎所用的编译器
     public $compiler = null;
@@ -18,10 +18,10 @@ class View
     //模板引擎缓存文件夹（存放资源文件）(可清空)
     public $cache_dir = '';
     //模板默认主题
-    public $theme = 'default';
+    public $theme = '';
 
     //模板文件后缀
-    public $suffix = '.tpl.php';
+    public $suffix = '';
     //模板自动更新
     public $auto_refresh = true;
     //模板数据
@@ -30,19 +30,28 @@ class View
     //构造函数
     public function __construct($engine = null)
     {
-        //如果存在引擎，则初始化编译
+        //如果存在引擎，则初始化编译器
         if ($engine) {
             $this->compiler = new $engine();
         } else {
-            $this->compiler = new \Kinfy\View\engine\Blade();
+            $engine = Config::get('view.engine');
+            $this->compiler = new $engine;
         }
-        //设置默认模板引擎的目录
+
         if (!$this->base_dir) {
-            $this->base_dir = 'D:/wampsever/wamp64/www/kinfy/app/View/';
+            $this->base_dir = Config::get('view.base_dir');
         }
-        //设置默认模板引擎的缓存目录
+
         if (!$this->cache_dir) {
-            $this->cache_dir = 'D:/wampsever/wamp64/www//kinfy/app/Cache/';
+            $this->cache_dir = Config::get('view.cache_dir');
+        }
+
+        if (!$this->theme) {
+            $this->theme = Config::get('view.theme');
+        }
+
+        if (!$this->suffix) {
+            $this->suffix = Config::get('view.suffix');
         }
 
     }
@@ -77,7 +86,7 @@ class View
      */
     public function tplCache($name)
     {
-        return $this->themeCacheDir() . $name . $this->suffix;
+        return $this->themeCacheDir() . $name . 'php';
     }
 
     /**

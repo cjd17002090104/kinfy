@@ -8,6 +8,7 @@
 
 namespace Kinfy\DB;
 
+use Kinfy\Config\Config;
 use \PDO;
 
 class DB
@@ -16,16 +17,11 @@ class DB
     protected $table;
     protected $primaryKey;
     //实例数据
-    protected $dbConfig = [
-        'PORT' => '3306',
-        'DB_NAME' => 'kinfy',
-        'ADMIN' => 'root',
-        'PASSWORD' => ''
-    ];
+    protected $dbConfig;
     //where条件
     private $where = [];
     private $group = "";
-    private $values = ['data'=>[]];
+    private $values = ['data' => []];
     private $join = "";
     private $fields = null;
     private $pdo;
@@ -41,6 +37,7 @@ class DB
      */
     public function dbLink()
     {
+        $this->dbConfig = Config::get('DB');
         try {
             $this->pdo = new PDO("mysql:host=localhost:{$this->dbConfig['PORT']};
              dbname={$this->dbConfig['DB_NAME']}", $this->dbConfig['ADMIN'], $this->dbConfig['PASSWORD']);
@@ -59,7 +56,7 @@ class DB
      */
     public function setPrimaryKey($primaryKey)
     {
-        $this->primaryKey=$primaryKey;
+        $this->primaryKey = $primaryKey;
     }
 
     /**
@@ -196,7 +193,7 @@ class DB
     {
         $this->where = [];
         $this->group = "";
-        $this->values = ['data'=>[]];
+        $this->values = ['data' => []];
         $this->join = "";
         $this->fields = null;
         $this->pdo;

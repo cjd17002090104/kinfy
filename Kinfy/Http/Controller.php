@@ -26,13 +26,14 @@ class Controller
         ],
         'suffix'=>[
             'login'=>'after',
-            'index'=>'before'
+            'index'=>'before',
         ],
         'band'=>[
             'login'
         ]
     ];
     public  static  function execMethod($obj,$method,$params=[]){
+
         if(method_exists($obj,$method)) {
             $obj->{$method}(...$params);
         }
@@ -57,14 +58,14 @@ class Controller
                 }
 
                 //执行前置
-                if(!empty(self::$conf['prefix'])){
+                if(isset(self::$conf['prefix'][$method])){
                     self::execMethod($obj,self::$conf['prefix'][$method].$method,$params);
                 }
 
                 $obj->{$method}(...$params);
 
                 //执行后置
-                if(!empty(self::$conf['suffix'])){
+                if(isset(self::$conf['suffix'][$method])){
                     self::execMethod($obj,self::$conf['suffix'][$method].$method,$params);
                 }
 

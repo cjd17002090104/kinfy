@@ -13,7 +13,7 @@ use Kinfy\Http\Router;
 use App\Model\Model;
 
 Router::get('/login','UserController@index');
-Router::get('/user',function (){
-    $model=new Model();
-    $model->printConfig();
+Router::get('/user','UserController@insert');
+Router::group(['middleware'=>'123'],function (){
+        Router::get('/123','UserController@index');
 });

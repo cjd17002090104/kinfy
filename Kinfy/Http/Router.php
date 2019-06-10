@@ -10,8 +10,7 @@
  */
 
 namespace Kinfy\Http;
-
-
+use Kinfy\Config\Config;
 class Router
 {
 
@@ -20,6 +19,9 @@ class Router
 
     //路由前缀
     public static $url_pre = [];
+
+    //存放路由过滤的中间件
+    public static $middlewares = [];
 
     //存放当前注册的所有的路由规则
     public static $routes = [];
@@ -41,7 +43,7 @@ class Router
      * 用于配置全局规则
      *
      * @param $param_name
-     * @param $pattern 规则
+     * @param $pattern /规则
      */
     public function rule($param_name, $pattern)
     {
@@ -52,27 +54,51 @@ class Router
     /**
      * 用于解析路由组
      *
-     * @param $pre 路由前缀
+     * @param $pre /路由前缀
      * @param $callback
      */
-    public static function group($pre, $callback)
+    public static function group($pre , $callback)
     {
-        array_push(self::$url_pre, $pre);
+        $p = '';
+        $m = '';
+        //判断是否有路由前缀和中间件
+        //group::(['prefix'=>,'middleware'=>])
+        if (is_array($pre)) {
 
-        if (is_callable($callback)) {
-            call_user_func($callback);
+            if (isset($pre['prefix']) && $pre['prefix']) {
+                $p = $pre['prefix'];
+            }
+
+            if (isset($pre['middleware']) && $pre['middleware']) {
+                $m = $pre['middleware'];
+            }
         }
 
-        array_pop(self::$url_pre);
+
+        $p && array_push(self::$url_pre, $p);
+        $m && array_push(self::$middlewares, $m);
+
+
+        if (is_callable($callback)) {
+            //递归，将匿名函数解包，所有将中间键和路由前缀扔给路由;
+            call_user_func($callback);
+
+        }
+
+        //清除
+        $p && array_pop(self::$url_pre);
+        $m && array_pop(self::$middlewares);
+
+
     }
 
 
     /**
      * 添加路由，降web.php的路由添加到路由数组中
      *
-     * @param $reqtype 请求类型
-     * @param $pattern 路由格式
-     * @param $callback 路由方法
+     * @param $reqtype /请求类型
+     * @param $pattern /路由格式
+     * @param $callback /路由方法
      * @param null $re_rule 路由正则
      */
     private static function addRoute($reqtype, $pattern, $callback, $re_rule = null)
@@ -82,11 +108,16 @@ class Router
         $reqtype = strtoupper($reqtype);
         $pattern = self::path(implode('/', self::$url_pre) . self::path($pattern));
         //$pattern = self::path($pattern);
+
+        $route = [
+            'callback' => $callback,
+            'middlewares' => self::$middlewares
+        ];
         //判断是否是带参数路由
         $is_regx = strpos($pattern, '{') !== false;
 
         if (!$is_regx) {
-            self::$routes[$reqtype][$pattern] = $callback;
+            self::$routes[$reqtype][$pattern] = $route;
         } else {
 
             $pattern_raw = $pattern;
@@ -123,7 +154,8 @@ class Router
             $route = [
                 'pattern_raw' => $pattern_raw,
                 'pattern_re' => '#^' . $pattern . '$#',
-                'callback' => $callback
+                'callback' => $callback,
+                'middlewares' => self::$middlewares
             ];
 
             //存入参数路由数组
@@ -203,16 +235,21 @@ class Router
         $is_matched = false;
         $callback = null;
         $params = [];
+        $middlewares = [];
 
         //首先判断是否是无参ANY路由
         if (isset($routes['ANY'][$url])) {
-            $callback = $routes['ANY'][$url];
+            $callback = $routes['ANY'][$url]['callback'];
+            $middlewares = $routes['ANY'][$url]['middlewares'];
+
             $is_matched = true;
         } else if (isset($routes[$reqtype][$url])) {
-            $callback = $routes[$reqtype][$url];
+            $callback = $routes[$reqtype][$url]['callback'];
+            $middlewares = $routes[$reqtype][$url]['middlewares'];
+
             $is_matched = true;
         } else {
-
+            //首先判断是否是有参ANY路由
             if (isset($re_routes['ANY'])) {
                 foreach ($routes['ANY'] as $pattern => $route) {
 
@@ -220,6 +257,7 @@ class Router
 
                     if ($is_matched) {
                         $callback = $route['callback'];
+                        $middlewares = $route['middlewares'];
                         array_shift($params);
                         break;
                     }
@@ -233,6 +271,7 @@ class Router
 
                     if ($is_matched) {
                         $callback = $route['callback'];
+                        $middlewares = $route['middlewares'];
                         array_shift($params);
                         break;
                     }
@@ -244,6 +283,29 @@ class Router
 
         //匹配成功后，判断回调否是可执行函数
         if ($is_matched) {
+            //先做中间件数组扁平化
+            //循环中间件
+            foreach ($middlewares as $ms) {
+                !is_array($ms)&&$ms=[$ms];
+                foreach ($ms as $m) {
+                    //判断闭包
+                    if (is_callable($m)) {
+                        call_user_func($m);
+                    } else {
+                        //获取中间件设置指定的中间件
+                        $mclass = Config::get('middleware.' . $m);
+                        if (is_array($mclass)) {
+                            foreach ($mclass as $mc) {
+                                $mobj = new $mc;
+                                $mobj->handle();
+                            }
+                        } else {
+                            $mobj = new $mclass;
+                            $mobj->handle();
+                        }
+                    }
+                }
+            }
             if (is_callable($callback)) {
                 call_user_func($callback, ...$params);
             } else if (is_callable(self::$onMatch)) {
